@@ -9,15 +9,13 @@ import (
 	"net/http"
 )
 
-type H struct {
-}
-
 func main() {
 	r := glu.New()
 	r.Get("/index", func(c *context.Context) {
 		c.StatusCode(http.StatusOK)
 		c.HTML("<h1>Hello Gee</h1>")
 	})
+	r.Use(gluRecover.New())
 	v1 := r.Group("/v1")
 	{
 		v1.Get("/", func(c *context.Context) {
@@ -25,7 +23,6 @@ func main() {
 			c.HTML("<h1>Hello Gee</h1>")
 		})
 		v1.Use(logger.New())
-		v1.Use(gluRecover.New())
 		v1.Get("/hello", func(c *context.Context) {
 			c.StatusCode(http.StatusOK)
 			// expect /hello?name=geektutu
