@@ -3,8 +3,9 @@ package cache
 import (
 	"fmt"
 	"log"
+	"math/rand"
+	"strconv"
 	"testing"
-	"time"
 )
 
 type String string
@@ -79,27 +80,40 @@ func TestLRUKCache(t *testing.T) {
 	}
 	fmt.Println(cache.Keys())
 }
-func TestRedisLRUCache(t *testing.T) {
-	cache := NewRedisLRUCache(30, 5, func(key string, value Value) {
-		fmt.Printf("onEvict: k: %v, v: %v\n", key, value)
-	})
-	cache.Put("key1", String("value1"))
-	cache.Put("key2", String("value2"))
-	cache.Put("key3", String("value3"))
-	value, isSuccess := cache.Get("key1")
-	log.Println(value, isSuccess)
-	time.Sleep(1)
-	value, isSuccess = cache.Get("key2")
-	log.Println(value, isSuccess)
-	time.Sleep(1)
-	value, isSuccess = cache.Get("key3")
-	log.Println(value, isSuccess)
-	time.Sleep(1)
-	cache.Put("key4", String("value4value4value4value420"))
-	//value, isSuccess = cache.Get("key1")
-	//log.Println(value, isSuccess)
-	//value, isSuccess = cache.Get("key2")
-	//log.Println(value, isSuccess)
-	//value, isSuccess = cache.Get("key3")
-	//log.Println(value, isSuccess)
+func BenchmarkRedisLRUCache(b *testing.B) {
+	b.ResetTimer()
+	cache := NewRedisLRUCache(1024*1024*1024, 5, nil)
+	r := rand.New(seed)
+	//fmt.Println(b.N)
+	for i := 1; i <= b.N; i++ {
+		cache.Put("key"+strconv.FormatInt(int64(r.Intn(b.N)), 10), String("value"+strconv.FormatInt(int64(i), 10)))
+	}
+}
+
+func BenchmarkLRUCache(b *testing.B) {
+	b.ResetTimer()
+	cache := NewLRUCache(1024*1024*10, nil)
+	r := rand.New(seed)
+	for i := 1; i <= b.N; i++ {
+		cache.Put("key"+strconv.FormatInt(int64(r.Intn(b.N)), 10), String("value"+strconv.FormatInt(int64(i), 10)))
+	}
+	//fmt.Println(cache.Len())
+	//b.Run("TestGet", func(b *testing.B) {
+	//	for i := 1; i <= b.N; i++ {
+	//		cache.Get("key" + strconv.FormatInt(int64(r.Intn(i)),10))
+	//	}
+	//})
+}
+func BenchmarkLRUKCache(b *testing.B) {
+	b.ResetTimer()
+	cache := NewLRUKCache(2, 1024*1024*10, nil)
+	r := rand.New(seed)
+	for i := 1; i <= b.N; i++ {
+		cache.Put("key"+strconv.FormatInt(int64(r.Intn(b.N)), 10), String("value"+strconv.FormatInt(int64(i), 10)))
+	}
+	//fmt.Println(cache.Len())
+	//b.Run("TestGet", func(b *testing.B) {
+	//	for i := 1; i <= b.N; i++ {
+	//		cache.Get("key" + strconv.FormatInt(int64(r.Intn(i)),10))
+	//	}
 }

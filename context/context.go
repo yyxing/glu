@@ -77,12 +77,8 @@ func (c *Context) HandlerIndex(n int) int {
 	c.currentHandlerIndex = n
 	return n
 }
-func NewContext(writer http.ResponseWriter, request *http.Request) *Context {
+func NewContext() *Context {
 	return &Context{
-		Writer:              writer,
-		Request:             request,
-		Path:                request.URL.Path,
-		Method:              request.Method,
 		handlers:            make(Handlers, 0),
 		currentHandlerIndex: -1,
 	}
@@ -130,6 +126,15 @@ func (c *Context) ContentType(cType string) {
 // 设置返回请求header
 func (c *Context) Header(key string, value string) {
 	c.Writer.Header().Set(key, value)
+}
+func (c *Context) Abort() {
+	c.currentHandlerIndex = len(c.handlers)
+}
+func (c *Context) Reset() {
+	c.currentHandlerIndex = -1
+	c.Path = c.Request.URL.Path
+	c.Method = c.Request.Method
+	c.handlers = c.handlers[0:0]
 }
 
 // 将json数据写入write流

@@ -1,6 +1,9 @@
 package router
 
-import "github.com/yyxing/glu/context"
+import (
+	"github.com/yyxing/glu/context"
+	"net/http"
+)
 
 // 分组路由
 type Group interface {
@@ -20,4 +23,8 @@ type Group interface {
 	Group(prefix string, handlers ...context.Handler) Group
 	// 中间件注入
 	Use(handler ...context.Handler)
+	// 获取group前缀
+	Prefix() string
+	// 获取Handler
+	ProxyHandler() http.Handler
 }

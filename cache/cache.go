@@ -8,14 +8,14 @@ type Cache interface {
 	Del(key string) bool
 	Len() int
 	Keys() []string
+	Size() uint64
 }
 
 // 存储到队列和表中的具体数据结构
 type entry struct {
-	key           string
-	value         Value
-	visitCount    uint
-	lastVisitTime time.Time
+	key        string
+	value      Value
+	visitCount uint
 }
 
 // 存储到队列和表中的具体数据结构

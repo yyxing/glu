@@ -3,12 +3,15 @@ package router
 import (
 	"github.com/yyxing/glu/context"
 	"net/http"
+	"sync"
 )
 
 type APIBuilder struct {
-	middlewares context.Handlers
-	prefix      string
-	router      *Router
+	middlewares  context.Handlers
+	prefix       string
+	router       *Router
+	proxyHandler http.Handler
+	pool         sync.Pool
 }
 
 func NewAPIBuilder() *APIBuilder {
@@ -16,6 +19,9 @@ func NewAPIBuilder() *APIBuilder {
 		middlewares: make(context.Handlers, 0),
 		prefix:      "/",
 		router:      NewRouter(),
+		pool: sync.Pool{New: func() interface{} {
+			return context.NewContext()
+		}},
 	}
 	return api
 }
@@ -37,19 +43,32 @@ func joinHandlers(h1 context.Handlers, h2 context.Handlers) context.Handlers {
 	copy(newHandlers[nowLen:], h2)
 	return newHandlers
 }
+func jsonPrefixPath(a, b string) string {
+	if a[len(a)-1] == '/' && b[0] == '/' {
+		b = b[1:]
+	}
+	if a[len(a)-1] != '/' && b[0] != '/' {
+		b = "/" + b
+	}
+	b = a + b
+	return b
+}
 func (api *APIBuilder) Group(prefix string, handlers ...context.Handler) Group {
 	middlewares := joinHandlers(api.middlewares, handlers)
-	if api.prefix[len(api.prefix)-1] == '/' && prefix[0] == '/' {
-		prefix = prefix[1:]
-	}
-	if api.prefix[len(api.prefix)-1] != '/' && prefix[0] != '/' {
-		prefix = "/" + prefix
-	}
-	prefix = api.prefix + prefix
+	prefix = jsonPrefixPath(api.prefix, prefix)
 	return &APIBuilder{
 		middlewares: middlewares,
 		prefix:      prefix,
 		router:      api.router,
+	}
+}
+func (api *APIBuilder) ReverseProxy(prefix string, handler http.Handler) Group {
+	prefix = jsonPrefixPath(api.prefix, prefix)
+	return &APIBuilder{
+		middlewares:  api.middlewares,
+		prefix:       prefix,
+		router:       api.router,
+		proxyHandler: handler,
 	}
 }
 func (api *APIBuilder) Use(handler ...context.Handler) {
@@ -96,7 +115,17 @@ func (api *APIBuilder) Handle(method string, pattern string, handler context.Han
 }
 
 func (api *APIBuilder) HandleRequest(w http.ResponseWriter, request *http.Request) {
-	ctx := context.NewContext(w, request)
-	//ctx.SetHandlers(api.middlewares...)
+	ctx := api.pool.Get().(*context.Context)
+	ctx.Request = request
+	ctx.Writer = w
+	ctx.Reset()
 	api.router.Serve(ctx)
+}
+
+func (api *APIBuilder) Prefix() string {
+	return api.prefix
+}
+
+func (api *APIBuilder) ProxyHandler() http.Handler {
+	return api.proxyHandler
 }

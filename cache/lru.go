@@ -64,10 +64,13 @@ func (cache *LRUCache) Put(key string, value Value) bool {
 		cache.useBytes += uint64(len(key) + value.Len())
 	}
 	// 内存超限 根据lru淘汰数据
-	if cache.useBytes > cache.maxBytes {
+	for cache.useBytes > cache.maxBytes {
 		cache.removeOldest()
 	}
 	return true
+}
+func (cache *LRUCache) Size() uint64 {
+	return cache.useBytes
 }
 func (cache *LRUCache) Get(key string) (interface{}, bool) {
 	// 读锁

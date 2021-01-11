@@ -145,7 +145,9 @@ func (cache *RedisLRUCache) removeOldest() {
 		cache.keyPool.entries[cache.keyPool.size] = nil
 	}
 }
-
+func (cache *RedisLRUCache) Size() uint64 {
+	return cache.useBytes
+}
 func (cache *RedisLRUCache) evictionPoolPopulate() {
 	samples := cache.samples()
 	now := time.Now()
@@ -166,9 +168,9 @@ func (cache *RedisLRUCache) evictionPoolPopulate() {
 			// 无空位 释放池中内存 释放完后可将当前抽样节点放入最后
 			if cache.keyPool.size >= EVPOOLSize {
 				delEntry := cache.keyPool.entries[cache.keyPool.size-1]
+				cache.delEntry(delEntry)
 				cache.keyPool.size--
 				cache.keyPool.entries[cache.keyPool.size] = nil
-				cache.delEntry(delEntry)
 			}
 			// 表示当前取样为可以放入池中的 且不为最后
 			// 原版c语言利用memmove插入至数组中 并且将k以后的内存向后移动 移出k位置的内存

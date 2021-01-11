@@ -31,6 +31,8 @@ type LRUKCache struct {
 	OnEvicted func(key string, value Value)
 	// 锁
 	mux sync.RWMutex
+	// 缓存池
+	cachePool sync.Pool
 }
 
 // 添加更新数据
@@ -101,6 +103,7 @@ func (cache *LRUKCache) removeOldest() {
 		if cache.OnEvicted != nil {
 			cache.OnEvicted(e.key, e.value)
 		}
+		cache.cachePool.Put(e)
 	}
 }
 
@@ -112,13 +115,17 @@ func (cache *LRUKCache) removeHistoryOldest() {
 		delete(cache.history, e.key)
 		cache.historyList.Remove(delElement)
 		cache.historyUseBytes -= uint64(len(e.key) + e.value.Len())
+		cache.cachePool.Put(e)
 	}
 }
 
 // 添加进历史页中
 func (cache *LRUKCache) putHistory(key string, value Value) {
-	element := cache.historyList.PushFront(&entry{key: key, value: value, visitCount: 1,
-		lastVisitTime: time.Now()})
+	e := cache.cachePool.Get().(*entry)
+	e.key = key
+	e.value = value
+	e.visitCount = 1
+	element := cache.historyList.PushFront(e)
 	cache.history[key] = element
 	cache.historyUseBytes += uint64(len(key) + value.Len())
 	for cache.historyUseBytes > cache.historyMaxBytes {
@@ -128,13 +135,19 @@ func (cache *LRUKCache) putHistory(key string, value Value) {
 
 // 添加进缓存页中
 func (cache *LRUKCache) putCache(key string, value Value) {
-	element := cache.cacheList.PushFront(&entry{key: key, value: value})
+	e := cache.cachePool.Get().(*entry)
+	e.key = key
+	e.value = value
+	element := cache.cacheList.PushFront(e)
 	cache.cache[key] = element
 	cache.useBytes += uint64(len(key) + value.Len())
 	// 大小超容 执行lru-k逻辑
 	for cache.useBytes > cache.maxBytes {
 		cache.removeOldest()
 	}
+}
+func (cache *LRUKCache) Size() uint64 {
+	return cache.useBytes
 }
 
 // 删除历史页中数据
@@ -207,5 +220,8 @@ func NewLRUKCache(k uint, capacity uint64, OnEvicted func(key string, value Valu
 		historyUseBytes: 0,
 		historyMaxBytes: capacity,
 		OnEvicted:       OnEvicted,
+		cachePool: sync.Pool{New: func() interface{} {
+			return new(entry)
+		}},
 	}
 }
