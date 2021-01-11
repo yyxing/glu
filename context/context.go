@@ -1,10 +1,18 @@
 package context
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
 	jsoniter "github.com/json-iterator/go"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 )
+
+const defaultMultipartMemory = 32 << 20 // 32 MB
 
 var (
 	json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -56,6 +64,8 @@ type Context struct {
 	Params              map[string]string
 	handlers            Handlers
 	currentHandlerIndex int
+	formCache           map[string][]string
+	MaxMultipartMemory  int64
 }
 
 func (c *Context) Next() {
@@ -81,6 +91,7 @@ func NewContext() *Context {
 	return &Context{
 		handlers:            make(Handlers, 0),
 		currentHandlerIndex: -1,
+		MaxMultipartMemory:  defaultMultipartMemory,
 	}
 }
 
@@ -135,6 +146,69 @@ func (c *Context) Reset() {
 	c.Path = c.Request.URL.Path
 	c.Method = c.Request.Method
 	c.handlers = c.handlers[0:0]
+}
+
+// post url-encode form
+func (c *Context) PostValue(key string) string {
+	return c.PostValueDefault(key, "")
+}
+
+func (c *Context) form() {
+	if c.formCache == nil {
+		c.formCache = make(url.Values)
+		req := c.Request
+		if err := req.ParseMultipartForm(c.MaxMultipartMemory); err != nil {
+			if err != http.ErrNotMultipart {
+				log.Printf("error on parse multipart form array: %v", err)
+			}
+		}
+		c.formCache = req.PostForm
+	}
+}
+func (c *Context) PostValues(key string) []string {
+	values, _ := c.GetPostValues(key)
+	return values
+}
+
+func (c *Context) GetPostValues(key string) ([]string, bool) {
+	c.form()
+	if values := c.formCache[key]; len(values) > 0 {
+		return values, true
+	}
+	return []string{}, false
+}
+
+func (c *Context) PostValueDefault(key string, def string) string {
+	if values, ok := c.GetPostValues(key); ok {
+		return values[0]
+	}
+	return def
+}
+
+func (c *Context) ReadJSON(jsonObjectPtr interface{}) error {
+	if c.Request.Body == nil {
+		return fmt.Errorf("unmarshal: empty body: %w", errors.New("not found"))
+	}
+	rawData, err := c.GetBody()
+	if err != nil {
+		return err
+	}
+	return jsoniter.Unmarshal(rawData, jsonObjectPtr)
+}
+
+func GetBody(r *http.Request, resetBody bool) ([]byte, error) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resetBody {
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	}
+	return data, nil
+}
+
+func (c *Context) GetBody() ([]byte, error) {
+	return GetBody(c.Request, true)
 }
 
 // 将json数据写入write流
