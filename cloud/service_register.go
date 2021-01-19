@@ -5,7 +5,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/yyxing/glu/util"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -89,7 +88,7 @@ func (c *NamingClient) reqApi(method, path string, params map[string]string) (re
 				logrus.Info(result)
 				return "", nil
 			}
-			log.Printf("api<%s>,method:<%s>, params:<%s>, call domain error:<%+v> , result:<%s>", path, method,
+			logrus.Printf("api<%s>,method:<%s>, params:<%s>, call domain error:<%+v> , result:<%s>", path, method,
 				util.ToJsonString(params), err, result)
 		}
 		return "", errors.New("retry " + strconv.Itoa(RetryRequestTimes) + " times request failed!")
@@ -191,7 +190,7 @@ func (c *NamingClient) put(path string, header http.Header, params map[string]st
 	request.Header = header
 	resp, errDo := c.client.Do(request)
 	if errDo != nil {
-		log.Println(errDo)
+		logrus.Println(errDo)
 		err = errDo
 	} else {
 		response = resp
