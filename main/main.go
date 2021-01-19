@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yyxing/glu"
-	"github.com/yyxing/glu/context"
-	"github.com/yyxing/glu/middleware/limiter"
-	"github.com/yyxing/glu/middleware/logger"
+	"github.com/yyxing/glu/cloud"
+	"github.com/yyxing/glu/util"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
@@ -22,29 +20,54 @@ var (
 )
 
 func main() {
-	rs1 := "http://127.0.0.1:2003/base"
-	url1, err := url.Parse(rs1)
+	engine := glu.Default()
+	serverConfig := []cloud.ServerConfig{
+		{
+			IpAddr: "localhost",
+			Port:   8000,
+			Scheme: "http",
+		},
+	}
+	namingClient := cloud.NewNamingClient(serverConfig, time.Millisecond*5000, "dev")
+	_, err := namingClient.RegisterInstance(cloud.Instance{
+		Ip:          util.GetLocalIP(),
+		Port:        2002,
+		ServiceName: "test",
+		Weight:      10,
+		App:         "test",
+		Ephemeral:   true,
+		Healthy:     true,
+	})
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	rs2 := "http://127.0.0.1:2004/base"
-	url2, err := url.Parse(rs2)
-	if err != nil {
-		log.Fatal(err)
-	}
-	proxy := NewHostsReverseProxy(url1, url2)
-	engine := glu.New()
-	l := logger.New()
-	v1 := engine.Group("/", limiter.New(1*time.Second, 2), l)
-	{
-		v1.Get("/:name", func(c *context.Context) {
-			c.WriteString("testttt")
-		})
-	}
-	engine.Proxy("/base", proxy)
 	engine.Run(addr)
-	//log.Println(http.ListenAndServe(addr, proxy))
 }
+
+//func main() {
+//	rs1 := "http://127.0.0.1:2003/base"
+//	url1, err := url.Parse(rs1)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	rs2 := "http://127.0.0.1:2004/base"
+//	url2, err := url.Parse(rs2)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	proxy := NewHostsReverseProxy(url1, url2)
+//	engine := glu.New()
+//	l := logger.New()
+//	v1 := engine.Group("/", limiter.New(1*time.Second, 2), l)
+//	{
+//		v1.Get("/:name", func(c *context.Context) {
+//			c.WriteString("testttt")
+//		})
+//	}
+//	engine.Proxy("/base", proxy)
+//	engine.Run(addr)
+//	//log.Println(http.ListenAndServe(addr, proxy))
+//}
 func NewHostsReverseProxy(targets ...*url.URL) *httputil.ReverseProxy {
 	director := func(req *http.Request) {
 		target := targets[rand.Intn(len(targets))]
