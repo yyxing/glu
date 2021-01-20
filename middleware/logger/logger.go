@@ -13,7 +13,7 @@ func init() {
 		DisableColors:   false,
 		ForceFormatting: true,
 		FullTimestamp:   true,
-		TimestampFormat: "2006-01-02 15:04:03.00000",
+		TimestampFormat: "2006-01-02 15:04:05.00000",
 	}
 	formatter.SetColorScheme(&prefixed.ColorScheme{
 		TimestampStyle: "37",
